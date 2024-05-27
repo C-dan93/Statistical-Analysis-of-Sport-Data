@@ -1,0 +1,199 @@
+---
+title: "MATPMDA PROJECT"
+output: html_notebook
+---
+
+##1.0 Installation of packages
+```{r}
+#install.packages(c("readxl", "dplyr", "ggplot2"))
+#install.packages("car")
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library("nortest")
+```
+##2.0 Setting the working directory and importing the data
+
+```{r}
+setwd("C:/Users/emerald/1Main assignment/R scripts/")
+#setwd ("D:/1Main assignment/R scripts")
+data <- read_excel("3147534SportsPeople Data.xlsx")
+```
+
+3.0 Inspecting the dat
+#3.1 Displaying the head
+```{r}
+head(data)
+```
+#3.2 Structure of the data
+```{r}
+str(data)
+```
+#3.3 Summary of the data
+```{r}
+summary(data)
+```
+#3.4 Check for missing values
+```{r}
+any(is.na(data))
+```
+#3.5 Check for null values
+```{r}
+any(is.null(data))
+```
+#3.6 Check for outliers
+```{r}
+boxplot(data$`LBM`, data$`BMI`)
+outliers <- boxplot(data[, c("LBM", "BMI")], plot = FALSE)$out
+print(outliers)
+```
+#3.7 Scatter plot of BMI vs LBM
+```{r}
+with(data, plot(BMI,LBM,
+ main="BMI VS LBM",
+ xlab="BMI",
+ ylab="LBM"))
+```
+##3.6 Checking the distribution of the data (checking the nature of symmetry)
+
+#3.61 Histogram of Lean Body Mass (LBM)"
+```{r}
+ggplot(data, aes(x = `LBM`)) +
+ geom_histogram(binwidth = 5, fill = "blue", color = "black", alpha = 0.7) +
+ labs(title = "Histogram of Lean Body Mass (LBM)")
+```
+#3.62 Histogram of Body Mass Index (BMI)
+```{r}
+ggplot(data, aes(x = `BMI`)) +
+ geom_histogram(binwidth = 1, fill = "green", color = "black", alpha = 0.7) +
+ labs(title = "Histogram of Body Mass Index (BMI)")
+```
+```{r}
+cor(data[, c("LBM", "BMI")])
+```
+```{r}
+males_count <- sum(data$Sex == "male")
+print(males_count)
+males_count <- sum(data$Sex == "female")
+print(males_count)
+```
+#4.0 Checking the normality of the distribution according to the sexes AndersonDarling’s Test
+```{r}
+ad.test(data$LBM[data$Sex == "male"])
+```
+```{r}
+ad.test(data$LBM[data$Sex == "female"])
+```
+#5.0 Checking the nature of the variance of the groups using Levene’s Test
+```{r}
+levene_test_result <- levenetTest(LBM ~ Sex, data = data)
+levene_test_result
+```
+The Levene’s test p value of 1.131e-05, which is way below the 0.05 (or 5%) significance level, indicated that the male and female groups have unequal variance. Due to this difference, the Welch-two sample t-test was used instead.
+
+
+#6.0 Welch’s t-test to determine if the null hypothesis should be accepted or rejected.
+```{r}
+t_test_result <- t.test(LBM ~ Sex, data = data, var.equal = FALSE)
+t_test_result
+p_value <- t_test_result$p.value
+if (p_value < 0.05) {
+#Print the result on different lines (using the \n )
+ cat("There is a statistically significant difference in mean LBM between males and 
+females.\n")
+} else {
+ cat("There is no statistically significant difference in mean LBM between males and 
+females.\n")
+}
+```
+
+The Welch Two Sample t test p value of 2.2e-16 which is way below 0.05 (or 5%) shows that there is enough evidence to reject the null hypothesis that true difference in means between group female and group male is equal to 0.
+In other words, there is a difference between mean LBM between in the male and female groups.
+
+#7.0 Calculating the correlation coefficient based on gender
+```{r}
+# Calculate correlation coefficient for males
+cor_male <- cor(data[data$Sex == "male", c("LBM", "BMI")])
+# Calculate correlation coefficient for females
+cor_female <- cor(data[data$Sex == "female", c("LBM", "BMI")])
+# Print correlation coefficients
+cat("Correlation coefficient for males:", cor_male, "\n")
+cat("Correlation coefficient for females:", cor_female, "\n")
+```
+The correlation coefficient for males is 0.7829081; for females, it is 0.6703704. This indicates a strong linear relationship between BMI and LBM in both males (to a greater degree) and females.
+This is not to say that one causes the other; correlation is not the same as causation. There could be a component common to both BMI and LBM that causes a rise in both
+
+
+#8.0 Creating the liner regression model
+```{r}
+# create a new data frame containing only information on males.
+male_data <- data[data$Sex == "male",]
+#Build the model for the male rows (LBM to be predicted by BMI)
+model = lm(LBM~BMI, data = male_data)
+#show summary of model
+summary(model)
+```
+Estimated intercept is -10.9376. This is the predicted value of the response variable (LBM) when the predictor variable (BMI) is 0. However, this interpretation does not have much value as BMI cannot take 0 as a value.
+
+Coefficient estimate for BMI is 3.5474. This is the change in LBM for one unit 
+increase in BMI, in other words, this represents the value LBM when the value of BMI is 1.
+The p-value is < 2 e-16 (which is quite less than 0.05), this indicates that BMI is a significant predictor of LBM in this model. 
+
+Residuals: This helps to access a model’s fit. The fact that the median (-0.6453) is 
+close to zero suggests that, on average, the model’s predictions are reasonably accurate. However, the spread of residuals indicates that there is variability in the accuracy of predictions across different observations.
+
+R -squared: The shows the proportion in variability of LBM (response variable) that is predicted by the BMI. The output of the R code shows that 61.29% of the variability in LBM is explained by BMI (predictor variable).
+
+The significance codes (***) suggest a high statistical significance.
+
+F-statistic: This tests the overall significance of the model. In this case, the F-statistic is 150.4 with a very low p-value (< 2.2e-16), indicating that the overall model is statistically significant.
+
+
+#9.0 Checking the assumptions of the model
+```{r}
+# 9.1Q-Q plot of residuals (checking the normality of residuals)
+qqnorm(residuals(model))
+qqline(residuals(model), col = 2)
+ad.test(residuals(model))
+#checking for the other assumptions (: Linearity, Independence of Residuals, and Homoscedasticity").
+plot(model)
+```
+The points on the Q-Q plot fell along a straight line. This suggests that the distribution of residuals is approximately normal. In other words, this confirms the assumption that the residuals are normally distributed.
+
+The random scattering on the “Residual vs Fitted”, “Scale-Location”, “Residual vs Leverage” plots confirm the following assumptions: Linearity, Independence of Residuals, and “Homoscedasticity”. (In addition to the linear relationship in the Q-Q Residual plot which confirms the assumption that the residuals are normally distributed.)
+
+#10.0 Hypotheses Testing
+```{r}
+male_data <- data[data$Sex == "male",]
+model = lm(LBM~BMI, data = male_data)
+summary(model)
+```
+```{r}
+par(mfrow = c(1,2))
+#plot the regression line
+plot(male_data$BMI,male_data$LBM,main="Regression line",
+ xlab="LBM",
+ ylab="BMI")
+abline(model,col="blue")
+# plot the fitted vs actual
+plot(male_data$LBM,model$fitted.values,main="Actual vs Fitted",
+ xlab="Actual LBM",
+ ylab="Fitted LMB")
+abline(a=0,b=1)
+```
+Interpretation: 
+• The p-value is less than 0.05 (or 5%). This provides enough evidence to reject the null hypothesis, which is, there is no linear relationship between LBM and BMI.
+Test Conclusion: There is a linear relationship between LBM and BMI.
+
+#11.0 Assessing the predictive performance of the model
+```{r}
+# Assuming you have a separate test dataset called 'test_data'
+predictions <- predict(lm_model, test_data)
+mse <- mean((predictions - test_data$LBM)^2)
+print(paste("Mean Squared Error:", mse))
+```
+
+
+
+
+
